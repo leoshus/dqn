@@ -4,6 +4,8 @@ from tensorflow.keras import Model, models, layers, optimizers
 from tensorflow.keras.optimizers import RMSprop
 from kk.kk_mdp import KKEnv
 import copy
+from collections import deque
+import random
 
 
 class DQN:
@@ -22,18 +24,10 @@ class DQN:
 
         self.learning_step_counter = 0
         self.epsilon = 0 if self.e_greedy_increment is not None else self.e_greedy
-        self.memory = np.zeros((self.memory_size, self.n_features * 2 + 2))
+        # self.memory = np.zeros((self.memory_size, self.n_features * 2 + 2))
+        self.memory = deque(maxlen=self.memory_size)
         self.create_model()
         self.cost_his = []
-        self.test_model()
-
-    def test_model(self):
-        s = tf.keras.Input(shape=(2,))
-        x = tf.keras.layers.Dense(10, activation='relu')(s)
-        x = tf.keras.layers.Dense(1)(x)
-        model = tf.keras.Model(inputs=s, outputs=x)
-        print(model(np.array([[0.5, 0.5]])))
-        pass
 
     def create_model(self):
         '''建立预测模型和target模型'''
@@ -55,6 +49,21 @@ class DQN:
         x = tf.keras.layers.Dense(1, name='l2')(x)
         self.target_net = tf.keras.Model(inputs=s_, outputs=x)
 
+    def save_model(self, fn):
+        # save model to file, give file name with .h5 extension
+        self.eval_net.save(fn)
+    def load_model(self,fn):
+        self.eval_net = tf.keras.models.load_model(fn)
+
+        # self.target_net.set_weights(self.eval_net.get_weights())
+
+    def target_update(self):
+        weights = self.eval_net.get_weights()
+        target_weights = self.target_net.get_weights()
+        for i in range(len(target_weights)):
+            target_weights[i] = weights[i]
+        self.target_net.set_weights(target_weights)
+
     def store_transition(self, s, a, r, s_):
         if not hasattr(self, 'memory_counter'):
             self.memory_counter = 0
@@ -63,18 +72,20 @@ class DQN:
         # transition = np.hstack((s, s_))
         # index = self.memory_counter % self.memory_size
         # self.memory[index, :] = transition
+        self.memory.append([s, a, r, s_])
         self.memory_counter += 1
 
     def choose_action(self, observation, sub, current_node_cpu, acts):
         observation = observation[np.newaxis, :]
 
         if np.random.uniform() < self.epsilon:
+            print(observation)
             actions_value = self.eval_net(observation).numpy()
             candidate_action = []
             candidate_score = []
             index = 0
             for score in actions_value[0]:
-                print(index, score[0])
+                # print(index, score[0])
                 if index not in acts and sub.nodes[index]['cpu_remain'] >= current_node_cpu:
                     candidate_action.append(index)
                     candidate_score.append(score[0])
@@ -91,31 +102,31 @@ class DQN:
         return action
 
     def learn(self):
-        if self.memory_counter > self.memory_size:
-            sample_index = np.random.choice(self.memory_size, size=self.batch_size)
-        else:
-            sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
-
-        batch_memory = self.memory[sample_index, :]
-        q_next = self.target_net(batch_memory[:, -self.n_features, :])
-        q_eval = self.eval_net(batch_memory[:, : self.n_features])
-
-        q_target = q_eval.copy()
-
-        batch_index = np.arange(self.batch_size, dtype=np.int32)
-        eval_act_index = batch_memory[:, self.n_features].astype(int)
-        reward = batch_memory[:, self.n_features + 1]
-
-        q_target[batch_index, eval_act_index] = reward + self.reward_decay * np.max(q_next, axis=1)
-
-        if self.learning_step_counter % self.replace_target_iter == 0:
-            for eval_layer, target_layer in zip(self.eval_model.layers, self.target_model.layers):
-                target_layer.set_weights(eval_layer.get_weights())
-            print('\n target_param_replaced\n')
-        self.cost = self.eval_model.train_on_batch(batch_memory[:, :self.n_features], q_target)
-        self.cost_his.append(self.cost)
-        self.epsilon = self.epsilon + self.e_greedy_increment if self.epsilon < self.e_greedy else self.e_greedy
-        self.learning_step_counter += 1
+        if len(self.memory) < self.batch_size:
+            return
+        samples = random.sample(self.memory, self.batch_size)
+        s, a, r, s_ = map(np.asarray, zip(*samples))
+        batch_s = np.array(s).reshape(self.batch_size, -1)
+        batch_s_ = np.array(s_).reshape(self.batch_size, -1)
+        batch_eval = self.eval_net(batch_s)
+        q_future = self.target_net(batch_s_)
+        print(batch_eval, q_future)
+        # q_target = q_eval.copy()
+        #
+        # batch_index = np.arange(self.batch_size, dtype=np.int32)
+        # eval_act_index = batch_memory[:, self.n_features].astype(int)
+        # reward = batch_memory[:, self.n_features + 1]
+        #
+        # q_target[batch_index, eval_act_index] = reward + self.reward_decay * np.max(q_next, axis=1)
+        #
+        # if self.learning_step_counter % self.replace_target_iter == 0:
+        #     for eval_layer, target_layer in zip(self.eval_model.layers, self.target_model.layers):
+        #         target_layer.set_weights(eval_layer.get_weights())
+        #     print('\n target_param_replaced\n')
+        # self.cost = self.eval_model.train_on_batch(batch_memory[:, :self.n_features], q_target)
+        # self.cost_his.append(self.cost)
+        # self.epsilon = self.epsilon + self.e_greedy_increment if self.epsilon < self.e_greedy else self.e_greedy
+        # self.learning_step_counter += 1
 
     def plot_cost(self):
         import matplotlib.pyplot as plt
