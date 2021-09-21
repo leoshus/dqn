@@ -52,7 +52,8 @@ class DQN:
     def save_model(self, fn):
         # save model to file, give file name with .h5 extension
         self.eval_net.save(fn)
-    def load_model(self,fn):
+
+    def load_model(self, fn):
         self.eval_net = tf.keras.models.load_model(fn)
 
         # self.target_net.set_weights(self.eval_net.get_weights())
@@ -108,9 +109,11 @@ class DQN:
         s, a, r, s_ = map(np.asarray, zip(*samples))
         batch_s = np.array(s).reshape(self.batch_size, -1)
         batch_s_ = np.array(s_).reshape(self.batch_size, -1)
-        batch_eval = self.eval_net(batch_s)
-        q_future = self.target_net(batch_s_)
+        batch_eval = self.target_net(batch_s)
+        q_future = self.eval_net(batch_s_)
         print(batch_eval, q_future)
+        batch_eval[range(self.batch_size), a] = r + q_future * self.reward_decay
+        history = self.eval_net(batch_s, batch_eval)
         # q_target = q_eval.copy()
         #
         # batch_index = np.arange(self.batch_size, dtype=np.int32)
