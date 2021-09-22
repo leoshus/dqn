@@ -5,7 +5,7 @@ from DeepQN import DQN
 
 def configure(sub, name, arg):
     training_set_path = 'kk/training_set/'
-    training_set = simulate_events_one(training_set_path, 10)
+    training_set = simulate_events_one(training_set_path, 1000)
     dqn = DQN(
         sub=sub,
         n_actions=sub.net.number_of_nodes(),

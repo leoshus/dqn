@@ -17,7 +17,7 @@ def kk_vne():
     # Step2: choose mapping algorithm
     algorithm = 'kkDQN'
     # 训练的轮次
-    arg = 3
+    arg = 10
 
     # Step3: deal virtual network request event
     # 处理虚拟网络映射请求
