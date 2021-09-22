@@ -46,7 +46,7 @@ class Substrate:
         node_map = self.node_mapping(vnr, algorithm, arg)
         if len(node_map) == vnr.number_of_nodes():
             # mapping virtual links
-            link_map = self.link_mapping(vnr, node_map, algorithm, arg)
+            link_map = self.link_mapping(vnr, node_map)
             if len(link_map) == vnr.number_of_edges():
                 self.mapped_info.update({vnr.graph['id']: (node_map, link_map)})
                 self.change_resource(vnr, 'allocate')
@@ -70,7 +70,7 @@ class Substrate:
         # 返回节点映射集合
         return node_map
 
-    def link_mapping(self, vnr, node_map, algorithm, arg):
+    def link_mapping(self, vnr, node_map):
         """求解链路映射问题"""
         link_map = {}
         for vLink in vnr.edges:

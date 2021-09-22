@@ -1,7 +1,5 @@
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras import Model, models, layers, optimizers
-from tensorflow.keras.optimizers import RMSprop
 from kk.kk_mdp import KKEnv
 import copy
 from collections import deque
@@ -24,7 +22,6 @@ class DQN:
 
         self.learning_step_counter = 0
         self.epsilon = 0 if self.e_greedy_increment is not None else self.e_greedy
-        # self.memory = np.zeros((self.memory_size, self.n_features * 2 + 2))
         self.memory = deque(maxlen=self.memory_size)
         self.create_model()
         self.cost_his = []
@@ -54,7 +51,7 @@ class DQN:
         self.eval_net.save(fn)
 
     def load_model(self, fn):
-        self.eval_net = tf.keras.models.load_model(fn)
+        self.eval_net = tf.keras.models.load_model(fn, compile=False)
 
         # self.target_net.set_weights(self.eval_net.get_weights())
 
@@ -102,6 +99,26 @@ class DQN:
             action = np.random.randint(0, self.n_actions)
         return action
 
+    def choose_predict_action(self, observation, sub, current_node_cpu, acts):
+        observation = observation[np.newaxis, :]
+        actions_value = self.eval_net(observation).numpy()
+        candidate_action = []
+        candidate_score = []
+        index = 0
+        for score in actions_value[0]:
+            # print(index, score[0])
+            if index not in acts and sub.nodes[index]['cpu_remain'] >= current_node_cpu:
+                candidate_action.append(index)
+                candidate_score.append(score[0])
+            index += 1
+        if len(candidate_action) == 0:
+            return -1
+        else:
+            candidate_prob = np.exp(candidate_score) / np.sum(np.exp(candidate_score))
+            # 选择动作
+            action = np.random.choice(candidate_action, p=candidate_prob)
+            return action
+
     def learn(self):
         if len(self.memory) < self.batch_size:
             return
@@ -112,11 +129,6 @@ class DQN:
         s, a, r, s_ = map(np.asarray, zip(*samples))
         batch_s = np.array(s).reshape(self.batch_size, self.n_actions, -1)
         batch_s_ = np.array(s_).reshape(self.batch_size, self.n_actions, -1)
-        # batch_eval = self.target_net(batch_s)
-        # q_future = self.eval_net(batch_s_)
-        # print(batch_eval, q_future)
-        # batch_eval[range(self.batch_size), a] = r + q_future * self.reward_decay
-        # history = self.eval_net(batch_s, batch_eval)
 
         with tf.GradientTape() as tape:
             q_next = self.target_net(batch_s_)
@@ -134,22 +146,6 @@ class DQN:
         self.cost_his.append(self.cost)
         self.epsilon = self.epsilon + self.e_greedy_increment if self.epsilon < self.e_greedy else self.e_greedy
         self.learning_step_counter += 1
-        # q_target = q_eval.copy()
-        #
-        # batch_index = np.arange(self.batch_size, dtype=np.int32)
-        # eval_act_index = batch_memory[:, self.n_features].astype(int)
-        # reward = batch_memory[:, self.n_features + 1]
-        #
-        # q_target[batch_index, eval_act_index] = reward + self.reward_decay * np.max(q_next, axis=1)
-        #
-        # if self.learning_step_counter % self.replace_target_iter == 0:
-        #     for eval_layer, target_layer in zip(self.eval_model.layers, self.target_model.layers):
-        #         target_layer.set_weights(eval_layer.get_weights())
-        #     print('\n target_param_replaced\n')
-        # self.cost = self.eval_model.train_on_batch(batch_memory[:, :self.n_features], q_target)
-        # self.cost_his.append(self.cost)
-        # self.epsilon = self.epsilon + self.e_greedy_increment if self.epsilon < self.e_greedy else self.e_greedy
-        # self.learning_step_counter += 1
 
     def plot_cost(self):
         import matplotlib.pyplot as plt
@@ -159,7 +155,6 @@ class DQN:
         plt.show()
 
     def train(self, training_set):
-        step = 0
         for episode in range(self.episodes):
             # 每轮训练开始前，都需要重置底层网络和相关的强化学习环境
             sub_copy = copy.deepcopy(self.sub)
@@ -182,6 +177,7 @@ class DQN:
                     observation = env.reset()
                     node_map = {}
                     acts = []
+                    queue = deque(maxlen=req.number_of_nodes())
                     for vn_id in range(req.number_of_nodes()):
                         sn_id = self.choose_action(observation, sub_copy.net, req.nodes[vn_id]['cpu'], acts)
                         if sn_id == -1:
@@ -189,12 +185,18 @@ class DQN:
                         else:
                             acts.append(sn_id)
                             observation_, reward, done, info = env.step(sn_id)
-                            self.store_transition(observation, sn_id, reward, observation_)
                             node_map.update({vn_id: sn_id})
+                            queue.append([observation, sn_id, observation_])
                             observation = observation_
                     if len(node_map) == req.number_of_nodes():
                         # if step > 200 and step % 5 == 0:
                         print("req %s mapping success" % req_id)
+                        reward, link_map = self.calculate_reward(sub_copy, req, node_map)
+                        sub_copy.mapped_info.update({req.graph['id']: (node_map, link_map)})
+                        sub_copy.change_resource(req, 'allocate')
+                        while queue:
+                            observation, sn_id, observation_ = queue.popleft()
+                            self.store_transition(observation, sn_id, reward, observation)
                         self.learn()
                     else:
                         print("mapping Failure!")
@@ -203,10 +205,46 @@ class DQN:
                     if req_id in sub_copy.mapped_info.keys():
                         sub_copy.change_resource(req, 'release')
                 env.set_sub(sub_copy.net)
-        env.destory()
 
-    def run(self):
-        pass
+    def calculate_reward(self, sub, req, node_map):
+        link_map = sub.link_mapping(req, node_map)
+        if len(link_map) == req.number_of_edges():
+            requested, occupied = 0, 0
+
+            # node resource
+            for vn_id, sn_id in node_map.items():
+                node_resource = req.nodes[vn_id]['cpu']
+                occupied += node_resource
+                requested += node_resource
+
+            # link resource
+            for vl, path in link_map.items():
+                link_resource = req[vl[0]][vl[1]]['bw']
+                requested += link_resource
+                occupied += link_resource * (len(path) - 1)
+
+            reward = requested / occupied
+
+            return reward, link_map
+        else:
+            return -1, link_map
+
+    def run(self, sub, req):
+        self.load_model('kk/model/kkDQN.h5')
+        node_map = {}
+        env = KKEnv(sub.net)
+        env.set_vnr(req)
+        observation = env.reset()
+        acts = []
+        for vn_id in range(req.number_of_nodes()):
+            sn_id = self.choose_predict_action(observation, sub.net, req.nodes[vn_id]['cpu'], acts)
+            if sn_id == -1:
+                return
+            else:
+                acts.append(sn_id)
+                observation, _, done, info = env.step(sn_id)
+                node_map.update({vn_id: sn_id})
+        return node_map
 
 
 if __name__ == "__main__":

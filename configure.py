@@ -5,7 +5,7 @@ from DeepQN import DQN
 
 def configure(sub, name, arg):
     training_set_path = 'kk/training_set/'
-    training_set = simulate_events_one(training_set_path, 1000)
+    training_set = simulate_events_one(training_set_path, 10)
     dqn = DQN(
         sub=sub,
         n_actions=sub.net.number_of_nodes(),
@@ -13,6 +13,7 @@ def configure(sub, name, arg):
         num_epoch=arg,
     )
     dqn.train(training_set)
+    dqn.save_model('kk/model/kkDQN.h5')
     dqn.plot_cost()
     return dqn
 
