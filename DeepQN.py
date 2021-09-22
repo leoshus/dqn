@@ -80,7 +80,7 @@ class DQN:
         observation = observation[np.newaxis, :]
 
         if np.random.uniform() < self.epsilon:
-            print(observation)
+            # print(observation.shape)
             actions_value = self.eval_net(observation).numpy()
             candidate_action = []
             candidate_score = []
@@ -105,15 +105,35 @@ class DQN:
     def learn(self):
         if len(self.memory) < self.batch_size:
             return
+        if self.learning_step_counter % self.replace_target_iter == 0:
+            self.target_update()
+
         samples = random.sample(self.memory, self.batch_size)
         s, a, r, s_ = map(np.asarray, zip(*samples))
-        batch_s = np.array(s).reshape(self.batch_size, -1)
-        batch_s_ = np.array(s_).reshape(self.batch_size, -1)
-        batch_eval = self.target_net(batch_s)
-        q_future = self.eval_net(batch_s_)
-        print(batch_eval, q_future)
-        batch_eval[range(self.batch_size), a] = r + q_future * self.reward_decay
-        history = self.eval_net(batch_s, batch_eval)
+        batch_s = np.array(s).reshape(self.batch_size, self.n_actions, -1)
+        batch_s_ = np.array(s_).reshape(self.batch_size, self.n_actions, -1)
+        # batch_eval = self.target_net(batch_s)
+        # q_future = self.eval_net(batch_s_)
+        # print(batch_eval, q_future)
+        # batch_eval[range(self.batch_size), a] = r + q_future * self.reward_decay
+        # history = self.eval_net(batch_s, batch_eval)
+
+        with tf.GradientTape() as tape:
+            q_next = self.target_net(batch_s_)
+            q_eval = self.eval_net(batch_s)
+            # print(q_next, q_eval)
+
+            q_target = q_eval.numpy()
+            batch_index = np.arange(self.batch_size, dtype=np.int32)
+            eval_act_index = np.array(a).reshape(self.batch_size, -1)
+            reward = np.array(r).reshape(self.batch_size, -1)
+            q_target[batch_index, eval_act_index] = reward + self.reward_decay * np.max(q_next, axis=1)
+            self.cost = self.loss(y_true=q_target, y_pred=q_eval)
+        gradients = tape.gradient(self.cost, self.eval_net.trainable_variables)
+        self._train_op.apply_gradients(zip(gradients, self.eval_net.trainable_variables))
+        self.cost_his.append(self.cost)
+        self.epsilon = self.epsilon + self.e_greedy_increment if self.epsilon < self.e_greedy else self.e_greedy
+        self.learning_step_counter += 1
         # q_target = q_eval.copy()
         #
         # batch_index = np.arange(self.batch_size, dtype=np.int32)
@@ -174,14 +194,15 @@ class DQN:
                             observation = observation_
                     if len(node_map) == req.number_of_nodes():
                         # if step > 200 and step % 5 == 0:
+                        print("req %s mapping success" % req_id)
                         self.learn()
                     else:
                         print("mapping Failure!")
-            if req.graph['type'] == 1:
-                print("\tIt's time is out, release the occupied resources")
-                if req_id in sub_copy.mapped_info.keys():
-                    sub_copy.change_resource(req, 'release')
-            env.set_sub(sub_copy.net)
+                if req.graph['type'] == 1:
+                    print("\tIt's time is out, release the occupied resources")
+                    if req_id in sub_copy.mapped_info.keys():
+                        sub_copy.change_resource(req, 'release')
+                env.set_sub(sub_copy.net)
         env.destory()
 
     def run(self):
