@@ -4,6 +4,7 @@ from kk.kk_mdp import KKEnv
 import copy
 from collections import deque
 import random
+import os
 
 
 class DQN:
@@ -25,6 +26,7 @@ class DQN:
         self.memory = deque(maxlen=self.memory_size)
         self.create_model()
         self.cost_his = []
+        self.result_dir = 'results/'
 
     def create_model(self):
         '''建立预测模型和target模型'''
@@ -149,9 +151,12 @@ class DQN:
 
     def plot_cost(self):
         import matplotlib.pyplot as plt
+        if not os.path.exists(self.result_dir):
+            os.makedirs(self.result_dir)
         plt.plot(np.arange(len(self.cost_his)), self.cost_his)
-        plt.ylabel('Cost')
+        plt.ylabel('Cost(loss)')
         plt.xlabel('training steps')
+        plt.savefig(self.result_dir + 'loss.png')
         plt.show()
 
     def train(self, training_set):
