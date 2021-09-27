@@ -8,7 +8,7 @@ def extract_network(path, filename):
     # 打开网络配置文件并按行读取
     with open(path + filename) as f:
         lines = f.readlines()
-    # 如果第一行只有两个数
+    # 如果第一行只有两个数(节点数和链路数)
     if len(lines[0].split()) == 2:
         # 构建物理网络
         """create a substrate network"""
