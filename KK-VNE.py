@@ -15,7 +15,8 @@ def kk_vne():
     event_queue = simulate_events_one('VNRequest/', 2000)
 
     # Step2: choose mapping algorithm
-    algorithm = 'kkDQN'
+    # algorithm = 'kkDQN'
+    algorithm = 'NoisyDQN'
     # 训练的轮次
     arg = 10
 

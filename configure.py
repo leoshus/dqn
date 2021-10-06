@@ -1,21 +1,36 @@
 from topology_maker import extract_network
 import copy
 from DeepQN import DQN
+from NoisyDQN import NoisyDQN
 
 
 def configure(sub, name, arg):
-    training_set_path = 'kk/training_set/'
-    training_set = simulate_events_one(training_set_path, 1000)
-    dqn = DQN(
-        sub=sub,
-        n_actions=sub.net.number_of_nodes(),
-        n_features=4,
-        num_epoch=arg,
-    )
-    dqn.train(training_set)
-    dqn.save_model('kk/model/kkDQN.h5')
-    dqn.plot_cost()
-    return dqn
+    if name == 'kkDQN':
+        training_set_path = 'kk/training_set/'
+        training_set = simulate_events_one(training_set_path, 1000)
+        dqn = DQN(
+            sub=sub,
+            n_actions=sub.net.number_of_nodes(),
+            n_features=4,
+            num_epoch=arg,
+        )
+        dqn.train(training_set)
+        dqn.save_model('kk/model/kkDQN.h5')
+        dqn.plot_cost()
+        return dqn
+    elif name == 'NoisyDQN':
+        training_set_path = 'kk/training_set/'
+        training_set = simulate_events_one(training_set_path, 1000)
+        dqn = NoisyDQN(
+            sub=sub,
+            n_actions=sub.net.number_of_nodes(),
+            n_features=4,
+            num_epoch=arg,
+        )
+        dqn.train(training_set)
+        dqn.save_model('kk/model/kkDQN.h5')
+        dqn.plot_cost()
+        return dqn
 
 
 def simulate_events_one(path, number):
