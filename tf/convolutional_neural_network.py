@@ -3,6 +3,7 @@ import numpy as np
 from tensorflow.keras import datasets, Model, layers, losses, optimizers, metrics
 
 
+# 卷积神经网络DEMO
 class CNN(Model):
     def __init__(self):
         super().__init__()

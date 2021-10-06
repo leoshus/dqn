@@ -3,6 +3,7 @@ import numpy as np
 from tensorflow.keras import Model, layers, optimizers, datasets, losses, metrics
 
 
+# 多层感知机DEMO
 class MNISTLoader:
     def __init__(self):
         mnist = datasets.mnist
