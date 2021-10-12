@@ -56,7 +56,7 @@ class NoisyDQN:
         self.eval_net.save(fn)
 
     def load_model(self, fn):
-        self.eval_net = tf.keras.models.load_model(fn, compile=False)
+        self.eval_net = tf.keras.models.load_model(fn, compile=False, custom_objects={"NoisyDense": NoisyDense})
 
         # self.target_net.set_weights(self.eval_net.get_weights())
 
@@ -232,7 +232,7 @@ class NoisyDQN:
             return -1, link_map
 
     def run(self, sub, req):
-        self.load_model('kk/model/kkDQN.h5')
+        self.load_model('kk/model/NoisyDQN.h5')
         node_map = {}
         env = KKEnv(sub.net)
         env.set_vnr(req)
@@ -251,22 +251,27 @@ class NoisyDQN:
 
 class NoisyDense(tf.keras.layers.Layer):
     def __init__(self, units, input_dim, std_init=0.5):
-        super().__init__()
+        super(NoisyDense, self).__init__()
         self.units = units
         self.std_init = std_init
+        self.input_dim = input_dim
         self.reset_noise(input_dim)
         mu_range = 1 / np.sqrt(input_dim)
         mu_initializer = tf.random_uniform_initializer(-mu_range, mu_range)
         sigma_initializer = tf.constant_initializer(self.std_init / np.sqrt(self.units))
-        self.weight_mu = tf.Variable(initial_value=mu_initializer(shape=(input_dim, units), dtype=tf.float32),
+        self.weight_mu = tf.Variable(name="weight_mu",
+                                     initial_value=mu_initializer(shape=(input_dim, units), dtype=tf.float32),
                                      trainable=True)
-        self.weight_sigma = tf.Variable(initial_value=sigma_initializer(shape=(input_dim, units), dtype=tf.float32),
+        self.weight_sigma = tf.Variable(name="weight_sigma",
+                                        initial_value=sigma_initializer(shape=(input_dim, units), dtype=tf.float32),
                                         trainable=True)
-        self.bias_mu = tf.Variable(initial_value=mu_initializer(shape=(units,), dtype=tf.float32),
+        self.bias_mu = tf.Variable(name="bias_mu", initial_value=mu_initializer(shape=(units,), dtype=tf.float32),
                                    trainable=True)
-        self.bias_sigma = tf.Variable(initial_value=sigma_initializer(shape=(units,), dtype=tf.float32),
+        self.bias_sigma = tf.Variable(name="bias_sigma",
+                                      initial_value=sigma_initializer(shape=(units,), dtype=tf.float32),
                                       trainable=True)
 
+    # @tf.function
     def call(self, inputs):
         self.kernel = self.weight_mu + self.weight_sigma * self.weights_eps
         self.bias = self.bias_mu + self.bias_sigma * self.bias_eps
@@ -281,4 +286,27 @@ class NoisyDense(tf.keras.layers.Layer):
         eps_out = self._scale_noise(self.units)
         self.weights_eps = tf.multiply(tf.expand_dims(eps_in, 1), eps_out)
         self.bias_eps = eps_out
-        pass
+
+    def get_config(self):
+        config = {
+            'units': self.units,
+            'input_dim': self.input_dim,
+            'std_init': self.std_init,
+        }
+        base_config = super(NoisyDense, self).get_config()
+        return dict(list(config.items()))
+        # config = super().get_config().copy()
+        # config.update({
+        #     'units': self.units,
+        #     'input_dim': self.input_dim,
+        #     'std_init': self.std_init,
+        #     # 'weight_mu': self.weight_mu,
+        #     # 'weight_sigma': self.weight_sigma,
+        #     # 'bias_mu': self.bias_mu,
+        #     # 'bias_sigma': self.bias_sigma,
+        #     # 'kernel': self.kernel,
+        #     # 'bias': self.bias,
+        #     # 'weights_eps': self.weights_eps,
+        #     # 'bias_eps': self.bias_eps,
+        # })
+        # return config

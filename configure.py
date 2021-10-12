@@ -28,7 +28,7 @@ def configure(sub, name, arg):
             num_epoch=arg,
         )
         dqn.train(training_set)
-        dqn.save_model('kk/model/kkDQN.h5')
+        dqn.save_model('kk/model/NoisyDQN.h5')
         dqn.plot_cost()
         return dqn
 
