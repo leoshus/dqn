@@ -47,11 +47,13 @@ class KKEnv(gym.Env):
         cpu_remain = (cpu_remain - np.min(cpu_remain)) / (np.max(cpu_remain) - np.min(cpu_remain))
         bw_all_remain = (bw_all_remain - np.min(bw_all_remain)) / (np.max(bw_all_remain) - np.min(bw_all_remain))
         avg_dst = (avg_dst - np.min(avg_dst)) / (np.max(avg_dst) - np.min(avg_dst))
-
+        k_feature = self.cal_nsf()
+        k_feature = (k_feature - np.min(k_feature)) / (np.max(k_feature) - np.min(k_feature))
         self.state = (cpu_remain,
                       bw_all_remain,
                       self.degree,
-                      avg_dst)
+                      avg_dst,
+                      k_feature)
         return np.vstack(self.state).transpose(), 0.0, False, {}
 
     def reset(self):
@@ -65,11 +67,44 @@ class KKEnv(gym.Env):
         cpu_remain = (cpu_remain - np.min(cpu_remain)) / (np.max(cpu_remain) - np.min(cpu_remain))
         bw_all_remain = (bw_all_remain - np.min(bw_all_remain)) / (np.max(bw_all_remain) - np.min(bw_all_remain))
         avg_dst = np.zeros(self.n_action).tolist()
+        k_feature = self.cal_nsf()
+        k_feature = (k_feature - np.min(k_feature)) / (np.max(k_feature) - np.min(k_feature))
         self.state = (cpu_remain,
                       bw_all_remain,
                       self.degree,
-                      avg_dst)
+                      avg_dst,
+                      k_feature)
         return np.vstack(self.state).transpose()
+
+    def cal_nsf(self):
+        g = copy.deepcopy(self.sub)
+        importance_dict = [0 for i in range(0, g.number_of_nodes())]
+        s = 0
+        # 直到所有节点都算出被移除为空
+        while (g.number_of_nodes() > 0):
+            # 暂存度为ks的顶点
+            temp = []
+            # for k,i in zip(list(g.node),range(0,len(g.node))):
+            # for k in range(g.number_of_nodes()):
+            for k in list(g.nodes()):
+                node_nei = list(g.neighbors(k))
+                v = len(node_nei)
+                if v <= s:
+                    # lsum = k的邻接链路的带宽求和
+                    # 找到邻接链路
+                    # node_nei = list(g.neighbors(k))
+                    r_band = 0
+                    # 权值求和（带宽求和）
+                    for n_n in node_nei:
+                        r_band = r_band + g.get_edge_data(k, n_n)['bw_remain']
+                    temp.append("1")
+                    shuzhi = (s * r_band) ** 0.5 * g.nodes[k]['cpu_remain']
+                    importance_dict[k] = shuzhi
+                    g.remove_node(k)
+            # 判断是否ks1是否含有值，如果含有即代表s不用增加，否则是s+1
+            if len(temp) == 0:
+                s += 1
+        return importance_dict
 
     def render(self, mode='human'):
         pass

@@ -16,8 +16,8 @@ class NoisyDQN:
         self.reward_decay = 0.9
         self.e_greedy = 0.9
         self.replace_target_iter = 300
-        self.memory_size = 500
-        self.batch_size = 32
+        self.memory_size = 1000
+        self.batch_size = 64
         self.e_greedy_increment = None
         self.episodes = num_epoch
 
