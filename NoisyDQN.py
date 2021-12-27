@@ -16,7 +16,7 @@ class NoisyDQN:
         self.reward_decay = 0.9
         self.e_greedy = 0.9
         self.replace_target_iter = 300
-        self.memory_size = 1000
+        self.memory_size = 2000
         self.batch_size = 64
         self.e_greedy_increment = None
         self.episodes = num_epoch
@@ -30,12 +30,13 @@ class NoisyDQN:
 
     def create_model(self):
         '''建立预测模型和target模型'''
+        dimension = 32
         # ------------------ build evaluate_net ------------------
         s = tf.keras.Input([None, self.n_features], name='s')
         # 预测模型
-        x = tf.keras.layers.Dense(128, activation=tf.keras.activations.relu, name='l1')(s)
+        x = tf.keras.layers.Dense(dimension, activation=tf.keras.activations.relu, name='l1')(s)
 
-        x = NoisyDense(128, input_dim=x.get_shape().as_list()[2])(x)
+        x = NoisyDense(dimension, input_dim=x.get_shape().as_list()[2])(x)
         x = tf.keras.layers.Dense(1, name='l2')(x)
         self.eval_net = tf.keras.Model(inputs=s, outputs=x)
         # 损失计算函数
@@ -46,8 +47,8 @@ class NoisyDQN:
         # ------------------ build target_net ------------------
         s_ = tf.keras.Input([None, self.n_features], name='s_')
         # target模型
-        x = tf.keras.layers.Dense(128, activation=tf.keras.activations.relu, name='l1')(s_)
-        x = NoisyDense(128, input_dim=x.get_shape().as_list()[2])(x)
+        x = tf.keras.layers.Dense(dimension, activation=tf.keras.activations.relu, name='l1')(s_)
+        x = NoisyDense(dimension, input_dim=x.get_shape().as_list()[2])(x)
         x = tf.keras.layers.Dense(1, name='l2')(x)
         self.target_net = tf.keras.Model(inputs=s_, outputs=x)
 

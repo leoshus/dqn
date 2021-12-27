@@ -29,7 +29,8 @@ def kk_vne():
 
     # Step4: ouput mapping result file
     analysis = Analysis()
-    analysis.save_result(sub, '%s-VNE-%s-cacln-1.txt' % (algorithm, arg))
+    # analysis.save_result(sub, '%s-VNE-%s-cacln-1.txt' % (algorithm, arg))
+    analysis.save_result(sub, 'NoisyDQN.txt')
 
 
 if __name__ == '__main__':

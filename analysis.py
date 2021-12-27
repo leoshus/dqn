@@ -8,7 +8,7 @@ class Analysis:
         self.result_dir = 'results/'
         if not os.path.exists(self.result_dir):
             os.makedirs(self.result_dir)
-        self.algorithms = ['RLN-ts']
+        self.algorithms = ['NoisyDQN']
         self.line_types = ['b:', 'r--', 'y-.', 'g-', 'c:', 'm:']
         self.metric_names = {'acceptance ratio': 'Acceptance Ratio',
                              'average revenue': 'Long Term Average Revenue',
