@@ -31,6 +31,7 @@ def kk_vne():
     analysis = Analysis()
     # analysis.save_result(sub, '%s-VNE-%s-cacln-1.txt' % (algorithm, arg))
     analysis.save_result(sub, 'NoisyDQN.txt')
+    analysis.draw_result()
 
 
 if __name__ == '__main__':

@@ -15,9 +15,9 @@ class NoisyDQN:
         self.learning_rate = 0.01
         self.reward_decay = 0.9
         self.e_greedy = 0.9
-        self.replace_target_iter = 300
-        self.memory_size = 2000
-        self.batch_size = 64
+        self.replace_target_iter = 50
+        self.memory_size = 500
+        self.batch_size = 16
         self.e_greedy_increment = None
         self.episodes = num_epoch
 
@@ -30,7 +30,7 @@ class NoisyDQN:
 
     def create_model(self):
         '''建立预测模型和target模型'''
-        dimension = 32
+        dimension = 8
         # ------------------ build evaluate_net ------------------
         s = tf.keras.Input([None, self.n_features], name='s')
         # 预测模型
@@ -71,7 +71,7 @@ class NoisyDQN:
     def store_transition(self, s, a, r, s_):
         if not hasattr(self, 'memory_counter'):
             self.memory_counter = 0
-        A = tf.one_hot(a, self.n_actions).numpy()
+        # A = tf.one_hot(a, self.n_actions).numpy()
         # transition = np.hstack((s, A, A * r, s_))
         # transition = np.hstack((s, s_))
         # index = self.memory_counter % self.memory_size
@@ -162,14 +162,13 @@ class NoisyDQN:
             # 每轮训练开始前，都需要重置底层网络和相关的强化学习环境
             sub_copy = copy.deepcopy(self.sub)
             # 构建环境
-            env = KKEnv(self.sub.net)
+            env = KKEnv(self.sub.net, self.n_features)
             # 记录已经处理的虚拟网络请求数量
             counter = 0
             for req in training_set:
-                env.render()
                 # 当前待映射的虚拟网络请求ID
                 req_id = req.graph['id']
-                print("\n Handling req %s ..." % req_id)
+                print("\n episode:%s Handling req %s ..." % (episode, req_id))
 
                 if req.graph['type'] == 0:
                     counter += 1
@@ -193,7 +192,7 @@ class NoisyDQN:
                             observation = observation_
                     if len(node_map) == req.number_of_nodes():
                         # if step > 200 and step % 5 == 0:
-                        print("req %s mapping success" % req_id)
+                        print("episode:%s req %s mapping success" % (episode, req_id))
                         reward, link_map = self.calculate_reward(sub_copy, req, node_map)
                         sub_copy.mapped_info.update({req.graph['id']: (node_map, link_map)})
                         sub_copy.change_resource(req, 'allocate')
@@ -217,7 +216,7 @@ class NoisyDQN:
             # node resource
             for vn_id, sn_id in node_map.items():
                 node_resource = req.nodes[vn_id]['cpu']
-                occupied += node_resource
+                occupied += sub.net.nodes[sn_id]['cpu']
                 requested += node_resource
 
             # link resource

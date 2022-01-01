@@ -24,7 +24,7 @@ def configure(sub, name, arg):
         dqn = NoisyDQN(
             sub=sub,
             n_actions=sub.net.number_of_nodes(),
-            n_features=5,
+            n_features=6,
             num_epoch=arg,
         )
         dqn.train(training_set)

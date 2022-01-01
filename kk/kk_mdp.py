@@ -7,9 +7,9 @@ import numpy as np
 
 class KKEnv(gym.Env):
 
-    def __init__(self, sub):
+    def __init__(self, sub, n_feature=4):
         self.count = -1
-        self.n_feature = 4
+        self.n_feature = n_feature
         self.n_action = sub.number_of_nodes()
         self.sub = copy.deepcopy(sub)
         self.action_space = spaces.Discrete(self.n_action)
@@ -20,6 +20,9 @@ class KKEnv(gym.Env):
         for i in nx.degree_centrality(sub).values():
             self.degree.append(i)
         self.vnr = None
+        self.cln = []
+        for j in nx.closeness_centrality(sub).values():
+            self.cln.append(j)
 
     def set_sub(self, sub):
         self.sub = copy.deepcopy(sub)
@@ -52,6 +55,7 @@ class KKEnv(gym.Env):
         self.state = (cpu_remain,
                       bw_all_remain,
                       self.degree,
+                      self.cln,
                       avg_dst,
                       k_feature)
         return np.vstack(self.state).transpose(), 0.0, False, {}
@@ -72,6 +76,7 @@ class KKEnv(gym.Env):
         self.state = (cpu_remain,
                       bw_all_remain,
                       self.degree,
+                      self.cln,
                       avg_dst,
                       k_feature)
         return np.vstack(self.state).transpose()
